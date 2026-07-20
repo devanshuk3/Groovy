@@ -1,4 +1,4 @@
-# Music player application
+# RhythmBox Music player
 ## Summary
 This is supposed to be a music player app that fetches audio stream from youtube urls and plays it on my phone.
 It should be exactly as a normal music streaming app which supports audio playback from youtube.
