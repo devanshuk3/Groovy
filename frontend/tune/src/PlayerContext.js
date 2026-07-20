@@ -37,7 +37,7 @@ export const PlayerProvider = ({ children }) => {
   useEffect(() => {
     return () => {
       if (soundPlayerRef.current) {
-        soundPlayerRef.current.stop().catch(() => {});
+        soundPlayerRef.current.stop().catch(() => { });
       }
     };
   }, []);

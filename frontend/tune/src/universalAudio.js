@@ -1,5 +1,5 @@
 /**
- * Universal Audio Engine for Stream Wrapper
+ * Universal Audio Engine for Groovy
  * Safely handles audio playback across Expo Go, Native Builds, and Web
  * without crashing when native modules like ExponentAV are missing.
  */

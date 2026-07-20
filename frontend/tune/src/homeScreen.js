@@ -91,7 +91,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.subGreeting}>Welcome back to tune</Text>
+            <Text style={styles.subGreeting}>Welcome back to Groovy</Text>
           </View>
           <View style={styles.connectionBadge}>
             <View
