@@ -19,7 +19,7 @@ const getBackendHost = () => {
     }
   }
 
-  if (Platform.OS === 'android') {
+  if (Platform.OS === 'android' && Constants.isDevice === false) {
     return '10.0.2.2';
   }
 

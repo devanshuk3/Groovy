@@ -44,6 +44,7 @@ export const PlayerProvider = ({ children }) => {
 
   // Playback status callback from UniversalSound
   const onPlaybackStatusUpdate = (status) => {
+    console.log('🎵 [PlayerContext] update:', status.isLoaded, status.isPlaying, status.positionMillis);
     if (!status.isLoaded) {
       if (status.error) {
         setPlaybackError(`Playback error: ${status.error}`);
@@ -53,8 +54,15 @@ export const PlayerProvider = ({ children }) => {
     }
 
     setPosition(status.positionMillis || 0);
-    setDuration(status.durationMillis || 0);
-    setIsPlaying(status.isPlaying);
+    if (status.durationMillis && status.durationMillis > 0) {
+      setDuration(status.durationMillis);
+    }
+
+    if (status.isPlaying) {
+      setIsPlaying(true);
+    } else if (!soundPlayerRef.current?.shouldPlay || status.didJustFinish) {
+      setIsPlaying(false);
+    }
 
     if (status.didJustFinish) {
       setIsPlaying(false);

@@ -27,10 +27,12 @@ export class UniversalSound {
     this.onStatusCallback = null;
     this.pollInterval = null;
     this.type = 'none'; // 'web', 'expo-av', 'expo-audio'
+    this.shouldPlay = false;
   }
 
   async loadAndPlay(uri, onStatusUpdate) {
     this.onStatusCallback = onStatusUpdate;
+    this.shouldPlay = true;
     await this.stop();
 
     // 1. Try HTML5 Web Audio if available (Browser or Web container)
@@ -106,29 +108,53 @@ export class UniversalSound {
     if (expoAudioModule?.createAudioPlayer) {
       try {
         console.log('🎵 [UniversalAudio] Loading expo-audio Player:', uri);
-        const player = expoAudioModule.createAudioPlayer(uri);
-        if (player && typeof player.play === 'function') {
-          player.play();
+
+        if (expoAudioModule.setIsAudioActiveAsync) {
+          await expoAudioModule.setIsAudioActiveAsync(true).catch(() => { });
         }
+        if (expoAudioModule.setAudioModeAsync) {
+          await expoAudioModule.setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: 'mixWithOthers',
+          }).catch(() => { });
+        }
+
+        const player = expoAudioModule.createAudioPlayer(uri);
         this.soundInstance = player;
         this.type = 'expo-audio';
 
-        this.pollInterval = setInterval(() => {
-          if (this.onStatusCallback && this.soundInstance) {
-            const current = this.soundInstance.currentStatus || {};
-            const pos = Math.floor((current.currentTime || this.soundInstance.currentTime || 0) * 1000);
-            const dur = Math.floor((current.duration || this.soundInstance.duration || 0) * 1000);
-            const playing = current.playing ?? (this.soundInstance.playing ?? true);
+        // Subscribe to native playback status updates
+        if (typeof player.addListener === 'function') {
+          this.statusSubscription = player.addListener('playbackStatusUpdate', (status) => {
+            console.log('🎵 [UniversalAudio] Native event:', JSON.stringify(status));
 
-            this.onStatusCallback({
-              isLoaded: true,
-              isPlaying: playing,
-              positionMillis: pos,
-              durationMillis: dur,
-              didJustFinish: false,
-            });
-          }
-        }, 500);
+            // If ready and should be playing but player paused, trigger play
+            if (status.playbackState === 'ready' && this.shouldPlay && !status.playing) {
+              if (typeof player.play === 'function') {
+                player.play();
+              }
+            }
+
+            if (this.onStatusCallback) {
+              const pos = Math.floor((status.currentTime || 0) * 1000);
+              const dur = Math.floor((status.duration || 0) * 1000);
+              this.onStatusCallback({
+                isLoaded: Boolean(status.isLoaded),
+                isPlaying: Boolean(status.playing),
+                positionMillis: pos,
+                durationMillis: dur,
+                didJustFinish: Boolean(status.didJustFinish),
+              });
+            }
+          });
+        }
+
+        // Start playback
+        if (typeof player.play === 'function') {
+          player.play();
+        }
+
         return;
       } catch (audioErr) {
         console.warn('[UniversalAudio] expo-audio native player error:', audioErr.message);
@@ -139,6 +165,7 @@ export class UniversalSound {
   }
 
   async play() {
+    this.shouldPlay = true;
     if (this.type === 'web' && this.webAudio) {
       await this.webAudio.play();
     } else if (this.type === 'expo-av' && this.soundInstance) {
@@ -151,6 +178,7 @@ export class UniversalSound {
   }
 
   async pause() {
+    this.shouldPlay = false;
     if (this.type === 'web' && this.webAudio) {
       this.webAudio.pause();
     } else if (this.type === 'expo-av' && this.soundInstance) {
@@ -176,6 +204,14 @@ export class UniversalSound {
   }
 
   async stop() {
+    this.shouldPlay = false;
+    if (this.statusSubscription) {
+      try {
+        this.statusSubscription.remove();
+      } catch (e) { }
+      this.statusSubscription = null;
+    }
+
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
@@ -188,7 +224,7 @@ export class UniversalSound {
         this.webAudio.src = '';
         this.webAudio.removeAttribute('src');
         this.webAudio.load();
-      } catch (e) {}
+      } catch (e) { }
       this.webAudio = null;
     }
 
@@ -209,7 +245,7 @@ export class UniversalSound {
             this.soundInstance.remove();
           }
         }
-      } catch (e) {}
+      } catch (e) { }
       this.soundInstance = null;
     }
     this.type = 'none';
@@ -217,6 +253,26 @@ export class UniversalSound {
 }
 
 export const setAudioModeSafe = async () => {
+  if (expoAudioModule?.setIsAudioActiveAsync) {
+    try {
+      await expoAudioModule.setIsAudioActiveAsync(true);
+    } catch (e) {
+      console.log('[UniversalAudio] setIsAudioActiveAsync notice:', e.message);
+    }
+  }
+
+  if (expoAudioModule?.setAudioModeAsync) {
+    try {
+      await expoAudioModule.setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: 'mixWithOthers',
+      });
+    } catch (e) {
+      console.log('[UniversalAudio] expo-audio setAudioModeAsync notice:', e.message);
+    }
+  }
+
   if (expoAvModule?.Audio?.setAudioModeAsync) {
     try {
       await expoAvModule.Audio.setAudioModeAsync({
